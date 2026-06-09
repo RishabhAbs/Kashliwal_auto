@@ -3677,14 +3677,14 @@ function App() {
             {/* Payments panel */}
             {selectedCreditSale && (
               <div className="modal-backdrop-overlay" style={{ zIndex: 9999, position: 'fixed', inset: 0 }} onClick={e => { if (e.target === e.currentTarget) setSelectedCreditSale(null); }}>
-                <div className="modal-content-card" style={{ maxWidth: '560px', width: '95%' }}>
+                <div className="modal-content-card" style={{ maxWidth: '560px', width: '95%', maxHeight: '90vh' }}>
                   <div className="modal-header-row">
                     <h3>Payments — {selectedCreditSale.party}</h3>
                     <button className="modal-close-btn" onClick={() => setSelectedCreditSale(null)}>
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
                     </button>
                   </div>
-                  <div className="modal-scroll-body" style={{ padding: '16px 20px' }}>
+                  <div className="modal-scroll-body" style={{ padding: '14px 20px', gap: '12px' }}>
                     <div style={{ display: 'flex', gap: '16px', marginBottom: '14px', fontSize: '13px', background: '#F7FAFC', borderRadius: '8px', padding: '10px 14px' }}>
                       <span>Voucher: <strong>{selectedCreditSale.voucher_no}</strong></span>
                       <span>Total: <strong>₹{parseFloat(selectedCreditSale.amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong></span>
@@ -3798,14 +3798,14 @@ function App() {
             {/* Add / Edit Credit Sale Modal */}
             {creditSaleModalOpen && (
               <div className="modal-backdrop-overlay" style={{ zIndex: 9999, position: 'fixed', inset: 0 }} onClick={e => { if (e.target === e.currentTarget) setCreditSaleModalOpen(false); }}>
-                <div className="modal-content-card" style={{ maxWidth: '440px', width: '95%' }}>
+                <div className="modal-content-card" style={{ maxWidth: '420px', width: '95%', maxHeight: 'unset' }}>
                   <div className="modal-header-row">
                     <h3>{creditSaleModalMode === 'create' ? 'Add Credit Sale' : 'Edit Credit Sale'}</h3>
                     <button className="modal-close-btn" onClick={() => setCreditSaleModalOpen(false)}>
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
                     </button>
                   </div>
-                  <div className="modal-scroll-body" style={{ padding: '18px 20px', gap: '14px' }}>
+                  <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
                     <div style={{ display: 'flex', gap: '12px' }}>
                       <div style={{ flex: 1 }}>
                         <label className="form-label">Voucher No. <span style={{ color: '#E53E3E' }}>*</span></label>
@@ -3826,7 +3826,7 @@ function App() {
                     </div>
                     {csFormError && <div style={{ color: '#E53E3E', fontSize: '12px' }}>{csFormError}</div>}
                   </div>
-                  <div className="modal-footer-actions">
+                  <div className="modal-footer-actions" style={{ padding: '0 20px 16px' }}>
                     <button className="modal-btn" style={{ background: '#F1F5F9', color: '#4A5568' }} onClick={() => setCreditSaleModalOpen(false)}>Cancel</button>
                     <button className="modal-btn" style={{ background: '#F9575C', color: '#fff' }} disabled={csSubmitting} onClick={async () => {
                       if (!csVoucherNo || !csDate || !csParty || !csAmount) { setCsFormError('All fields are required.'); return; }
