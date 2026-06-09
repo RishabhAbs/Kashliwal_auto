@@ -167,6 +167,32 @@ const initializeDatabase = async () => {
     await addColumnIfMissing('tally_transactions', 'remark',     'TEXT');
     await addColumnIfMissing('tally_transactions', 'created_at', 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP');
 
+    // Credit Sales tables
+    await dbPool.query(`
+      CREATE TABLE IF NOT EXISTS credit_sales (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        voucher_no VARCHAR(100) NOT NULL,
+        \`date\` DATE NOT NULL,
+        party VARCHAR(255) NOT NULL,
+        amount DECIMAL(15,2) NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+    console.log('Verified/Created "credit_sales" table.');
+
+    await dbPool.query(`
+      CREATE TABLE IF NOT EXISTS credit_sale_payments (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        credit_sale_id INT NOT NULL,
+        payment_date DATE NOT NULL,
+        paid_amount DECIMAL(15,2) NOT NULL,
+        remark TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (credit_sale_id) REFERENCES credit_sales(id) ON DELETE CASCADE
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+    console.log('Verified/Created "credit_sale_payments" table.');
+
     // 6. Seed default super admin user if empty (to allow initial login)
     const [userRows] = await dbPool.query('SELECT COUNT(*) as count FROM users');
     if (userRows[0].count === 0) {
@@ -1102,6 +1128,107 @@ app.get('/api/tally/outstanding', async (req, res) => {
   } catch (error) {
     console.error('Outstanding error:', error.message);
     res.status(503).json({ success: false, message: error.message, data: [] });
+  }
+});
+
+// ── Credit Sales ──────────────────────────────────────────────────────────────
+
+// List all credit sales with total paid and balance
+app.get('/api/credit-sales', async (req, res) => {
+  try {
+    const [rows] = await dbPool.query(`
+      SELECT cs.*,
+        COALESCE(SUM(p.paid_amount), 0) AS total_paid,
+        (cs.amount - COALESCE(SUM(p.paid_amount), 0)) AS balance
+      FROM credit_sales cs
+      LEFT JOIN credit_sale_payments p ON p.credit_sale_id = cs.id
+      GROUP BY cs.id
+      ORDER BY cs.date DESC, cs.id DESC
+    `);
+    res.json({ success: true, data: rows });
+  } catch (e) {
+    res.json({ success: false, message: e.message });
+  }
+});
+
+// Create a credit sale entry
+app.post('/api/credit-sales', async (req, res) => {
+  const { voucher_no, date, party, amount } = req.body;
+  if (!voucher_no || !date || !party || !amount) {
+    return res.json({ success: false, message: 'All fields required.' });
+  }
+  try {
+    const [result] = await dbPool.query(
+      'INSERT INTO credit_sales (voucher_no, date, party, amount) VALUES (?, ?, ?, ?)',
+      [voucher_no, date, party, parseFloat(amount)]
+    );
+    res.json({ success: true, id: result.insertId });
+  } catch (e) {
+    res.json({ success: false, message: e.message });
+  }
+});
+
+// Update a credit sale entry
+app.put('/api/credit-sales/:id', async (req, res) => {
+  const { voucher_no, date, party, amount } = req.body;
+  try {
+    await dbPool.query(
+      'UPDATE credit_sales SET voucher_no=?, date=?, party=?, amount=? WHERE id=?',
+      [voucher_no, date, party, parseFloat(amount), req.params.id]
+    );
+    res.json({ success: true });
+  } catch (e) {
+    res.json({ success: false, message: e.message });
+  }
+});
+
+// Delete a credit sale entry (payments cascade)
+app.delete('/api/credit-sales/:id', async (req, res) => {
+  try {
+    await dbPool.query('DELETE FROM credit_sales WHERE id=?', [req.params.id]);
+    res.json({ success: true });
+  } catch (e) {
+    res.json({ success: false, message: e.message });
+  }
+});
+
+// Get payments for a credit sale
+app.get('/api/credit-sales/:id/payments', async (req, res) => {
+  try {
+    const [rows] = await dbPool.query(
+      'SELECT * FROM credit_sale_payments WHERE credit_sale_id=? ORDER BY payment_date ASC',
+      [req.params.id]
+    );
+    res.json({ success: true, data: rows });
+  } catch (e) {
+    res.json({ success: false, message: e.message });
+  }
+});
+
+// Add a payment to a credit sale
+app.post('/api/credit-sales/:id/payments', async (req, res) => {
+  const { payment_date, paid_amount, remark } = req.body;
+  if (!payment_date || !paid_amount) {
+    return res.json({ success: false, message: 'Date and amount required.' });
+  }
+  try {
+    const [result] = await dbPool.query(
+      'INSERT INTO credit_sale_payments (credit_sale_id, payment_date, paid_amount, remark) VALUES (?, ?, ?, ?)',
+      [req.params.id, payment_date, parseFloat(paid_amount), remark || '']
+    );
+    res.json({ success: true, id: result.insertId });
+  } catch (e) {
+    res.json({ success: false, message: e.message });
+  }
+});
+
+// Delete a payment
+app.delete('/api/credit-sales/:saleId/payments/:payId', async (req, res) => {
+  try {
+    await dbPool.query('DELETE FROM credit_sale_payments WHERE id=? AND credit_sale_id=?', [req.params.payId, req.params.saleId]);
+    res.json({ success: true });
+  } catch (e) {
+    res.json({ success: false, message: e.message });
   }
 });
 

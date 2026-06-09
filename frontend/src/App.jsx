@@ -167,6 +167,56 @@ function App() {
   const [outstandingEffectiveTo, setOutstandingEffectiveTo] = useState('');
   const [outstandingDateCapped, setOutstandingDateCapped] = useState(false);
 
+  // Credit Sales states
+  const [creditSales, setCreditSales] = useState([]);
+  const [isLoadingCreditSales, setIsLoadingCreditSales] = useState(false);
+  const [creditSalesSearch, setCreditSalesSearch] = useState('');
+  const [creditSaleModalOpen, setCreditSaleModalOpen] = useState(false);
+  const [creditSaleModalMode, setCreditSaleModalMode] = useState('create');
+  const [editingCreditSaleId, setEditingCreditSaleId] = useState(null);
+  const [csVoucherNo, setCsVoucherNo] = useState('');
+  const [csDate, setCsDate] = useState('');
+  const [csParty, setCsParty] = useState('');
+  const [csAmount, setCsAmount] = useState('');
+  const [csFormError, setCsFormError] = useState('');
+  const [csSubmitting, setCsSubmitting] = useState(false);
+  // Payments panel
+  const [selectedCreditSale, setSelectedCreditSale] = useState(null);
+  const [salePayments, setSalePayments] = useState([]);
+  const [isLoadingPayments, setIsLoadingPayments] = useState(false);
+  const [paymentDate, setPaymentDate] = useState('');
+  const [paymentAmount, setPaymentAmount] = useState('');
+  const [paymentRemark, setPaymentRemark] = useState('');
+  const [paymentSubmitting, setPaymentSubmitting] = useState(false);
+  const [paymentError, setPaymentError] = useState('');
+
+  const loadCreditSales = async () => {
+    setIsLoadingCreditSales(true);
+    try {
+      const res = await fetch(`${API_BASE}/credit-sales`);
+      const data = await res.json();
+      if (data.success) setCreditSales(data.data || []);
+    } catch (e) {
+      // silently fail
+    } finally {
+      setIsLoadingCreditSales(false);
+    }
+  };
+
+  const loadSalePayments = async (saleId) => {
+    setIsLoadingPayments(true);
+    setSalePayments([]);
+    try {
+      const res = await fetch(`${API_BASE}/credit-sales/${saleId}/payments`);
+      const data = await res.json();
+      if (data.success) setSalePayments(data.data || []);
+    } catch (e) {
+      // silently fail
+    } finally {
+      setIsLoadingPayments(false);
+    }
+  };
+
   const loadOutstanding = async (from, to) => {
     setIsLoadingOutstanding(true);
     setOutstandingError('');
@@ -1201,6 +1251,7 @@ function App() {
             {hasPermission('cash-book') && <a href="#cash-book" className={`nav-tab ${activeTab === 'cash-book' ? 'active' : ''}`} onClick={() => setActiveTab('cash-book')}>Cash Book</a>}
             {hasPermission('outstanding') && <a href="#outstanding" className={`nav-tab ${activeTab === 'outstanding' ? 'active' : ''}`} onClick={() => setActiveTab('outstanding')}>Outstanding</a>}
             {hasPermission('transaction') && <a href="#transaction" className={`nav-tab ${activeTab === 'transaction' ? 'active' : ''}`} onClick={() => setActiveTab('transaction')}>Transaction</a>}
+            {isAdmin() && <a href="#credit-sales" className={`nav-tab ${activeTab === 'credit-sales' ? 'active' : ''}`} onClick={() => { setActiveTab('credit-sales'); loadCreditSales(); }}>Credit Sales</a>}
           </div>
         </div>
 
@@ -3449,6 +3500,360 @@ function App() {
                       </button>
                     </div>
                   </form>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Credit Sales */}
+        {activeTab === 'credit-sales' && (
+          <div className="ledger-master-view">
+            <div className="master-toolbar-row">
+              <div className="master-search-bar-full">
+                <svg className="flex-search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#A0AEC0" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="11" cy="11" r="8"></circle>
+                  <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                </svg>
+                <input
+                  type="text"
+                  placeholder="Search by voucher no. or party..."
+                  value={creditSalesSearch}
+                  onChange={e => setCreditSalesSearch(e.target.value)}
+                />
+              </div>
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button className="master-sync-btn" title="Refresh" onClick={loadCreditSales} disabled={isLoadingCreditSales}>
+                  <svg className={isLoadingCreditSales ? 'animate-spin' : ''} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4A5568" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="23 4 23 10 17 10"></polyline>
+                    <polyline points="1 20 1 14 7 14"></polyline>
+                    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                  </svg>
+                </button>
+                <button className="add-transaction-trigger-btn animate-button" onClick={() => {
+                  setCreditSaleModalMode('create');
+                  setEditingCreditSaleId(null);
+                  setCsVoucherNo(''); setCsDate(''); setCsParty(''); setCsAmount('');
+                  setCsFormError('');
+                  setCreditSaleModalOpen(true);
+                }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                  </svg>
+                  <span className="txn-btn-label">Add Credit Sale</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Table */}
+            <div className="master-grid-card desktop-only">
+              <div className="master-table-wrapper">
+                <table className="master-format-table">
+                  <thead>
+                    <tr>
+                      <th style={{ width: '5%', textAlign: 'center' }}>#</th>
+                      <th style={{ width: '14%' }}>Voucher No.</th>
+                      <th style={{ width: '12%' }}>Date</th>
+                      <th style={{ width: '28%' }}>Party</th>
+                      <th style={{ width: '13%', textAlign: 'right' }}>Amount (₹)</th>
+                      <th style={{ width: '13%', textAlign: 'right' }}>Paid (₹)</th>
+                      <th style={{ width: '13%', textAlign: 'right' }}>Balance (₹)</th>
+                      <th style={{ width: '12%', textAlign: 'center' }}>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {isLoadingCreditSales ? (
+                      <tr><td colSpan="8" style={{ textAlign: 'center', padding: '30px', color: '#A0AEC0' }}>Loading...</td></tr>
+                    ) : creditSales.filter(s =>
+                        s.voucher_no?.toLowerCase().includes(creditSalesSearch.toLowerCase()) ||
+                        s.party?.toLowerCase().includes(creditSalesSearch.toLowerCase())
+                      ).length === 0 ? (
+                      <tr><td colSpan="8" style={{ textAlign: 'center', padding: '30px', color: '#A0AEC0' }}>No credit sales found.</td></tr>
+                    ) : creditSales.filter(s =>
+                        s.voucher_no?.toLowerCase().includes(creditSalesSearch.toLowerCase()) ||
+                        s.party?.toLowerCase().includes(creditSalesSearch.toLowerCase())
+                      ).map((sale, idx) => (
+                      <tr key={sale.id} style={{ cursor: 'pointer' }}>
+                        <td style={{ textAlign: 'center' }}>{idx + 1}</td>
+                        <td>{sale.voucher_no}</td>
+                        <td>{sale.date ? sale.date.split('T')[0] : ''}</td>
+                        <td>{sale.party}</td>
+                        <td style={{ textAlign: 'right' }}>₹{parseFloat(sale.amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+                        <td style={{ textAlign: 'right', color: '#38A169' }}>₹{parseFloat(sale.total_paid || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+                        <td style={{ textAlign: 'right', color: parseFloat(sale.balance) > 0 ? '#E53E3E' : '#38A169', fontWeight: 600 }}>₹{parseFloat(sale.balance || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+                        <td style={{ textAlign: 'center' }}>
+                          <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
+                            <button title="Add / View Payments" className="master-edit-btn" onClick={() => {
+                              setSelectedCreditSale(sale);
+                              setPaymentDate(''); setPaymentAmount(''); setPaymentRemark(''); setPaymentError('');
+                              loadSalePayments(sale.id);
+                            }}>
+                              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                <rect x="2" y="5" width="20" height="14" rx="2"></rect>
+                                <line x1="2" y1="10" x2="22" y2="10"></line>
+                              </svg>
+                            </button>
+                            <button title="Edit" className="master-edit-btn" onClick={() => {
+                              setCreditSaleModalMode('edit');
+                              setEditingCreditSaleId(sale.id);
+                              setCsVoucherNo(sale.voucher_no);
+                              setCsDate(sale.date ? sale.date.split('T')[0] : '');
+                              setCsParty(sale.party);
+                              setCsAmount(String(sale.amount));
+                              setCsFormError('');
+                              setCreditSaleModalOpen(true);
+                            }}>
+                              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                              </svg>
+                            </button>
+                            <button title="Delete" className="master-delete-btn" onClick={async () => {
+                              if (!window.confirm(`Delete credit sale "${sale.voucher_no}"?`)) return;
+                              await fetch(`${API_BASE}/credit-sales/${sale.id}`, { method: 'DELETE' });
+                              loadCreditSales();
+                              if (selectedCreditSale?.id === sale.id) setSelectedCreditSale(null);
+                            }}>
+                              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                <polyline points="3 6 5 6 21 6"></polyline>
+                                <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path>
+                                <path d="M10 11v6"></path><path d="M14 11v6"></path>
+                                <path d="M9 6V4h6v2"></path>
+                              </svg>
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Mobile cards */}
+            <div className="mobile-only" style={{ padding: '0 12px 80px' }}>
+              {creditSales.filter(s =>
+                s.voucher_no?.toLowerCase().includes(creditSalesSearch.toLowerCase()) ||
+                s.party?.toLowerCase().includes(creditSalesSearch.toLowerCase())
+              ).map(sale => (
+                <div key={sale.id} className="mobile-ledger-card" style={{ marginBottom: '10px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <div>
+                      <div style={{ fontWeight: 600, fontSize: '14px' }}>{sale.party}</div>
+                      <div style={{ fontSize: '12px', color: '#718096' }}>#{sale.voucher_no} &bull; {sale.date ? sale.date.split('T')[0] : ''}</div>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ fontWeight: 600 }}>₹{parseFloat(sale.amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
+                      <div style={{ fontSize: '12px', color: parseFloat(sale.balance) > 0 ? '#E53E3E' : '#38A169' }}>
+                        Bal: ₹{parseFloat(sale.balance || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+                    <button className="master-edit-btn" style={{ flex: 1 }} onClick={() => {
+                      setSelectedCreditSale(sale);
+                      setPaymentDate(''); setPaymentAmount(''); setPaymentRemark(''); setPaymentError('');
+                      loadSalePayments(sale.id);
+                    }}>Payments</button>
+                    <button className="master-edit-btn" onClick={() => {
+                      setCreditSaleModalMode('edit'); setEditingCreditSaleId(sale.id);
+                      setCsVoucherNo(sale.voucher_no); setCsDate(sale.date ? sale.date.split('T')[0] : '');
+                      setCsParty(sale.party); setCsAmount(String(sale.amount)); setCsFormError('');
+                      setCreditSaleModalOpen(true);
+                    }}>Edit</button>
+                    <button className="master-delete-btn" onClick={async () => {
+                      if (!window.confirm(`Delete "${sale.voucher_no}"?`)) return;
+                      await fetch(`${API_BASE}/credit-sales/${sale.id}`, { method: 'DELETE' });
+                      loadCreditSales();
+                      if (selectedCreditSale?.id === sale.id) setSelectedCreditSale(null);
+                    }}>Del</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Payments panel */}
+            {selectedCreditSale && (
+              <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) setSelectedCreditSale(null); }}>
+                <div className="modal-box" style={{ maxWidth: '560px', width: '95%' }}>
+                  <div className="modal-header">
+                    <h3>Payments — {selectedCreditSale.party}</h3>
+                    <button className="modal-close-btn" onClick={() => setSelectedCreditSale(null)}>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                    </button>
+                  </div>
+                  <div className="modal-body">
+                    <div style={{ display: 'flex', gap: '16px', marginBottom: '14px', fontSize: '13px', background: '#F7FAFC', borderRadius: '8px', padding: '10px 14px' }}>
+                      <span>Voucher: <strong>{selectedCreditSale.voucher_no}</strong></span>
+                      <span>Total: <strong>₹{parseFloat(selectedCreditSale.amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong></span>
+                      <span style={{ color: parseFloat(selectedCreditSale.balance) > 0 ? '#E53E3E' : '#38A169' }}>
+                        Balance: <strong>₹{parseFloat(selectedCreditSale.balance || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong>
+                      </span>
+                    </div>
+
+                    {/* Add payment form */}
+                    <div style={{ background: '#EBF8FF', borderRadius: '8px', padding: '12px 14px', marginBottom: '14px' }}>
+                      <div style={{ fontWeight: 600, fontSize: '13px', marginBottom: '10px', color: '#2B6CB0' }}>Add Payment</div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '8px' }}>
+                        <div>
+                          <label className="form-label">Date</label>
+                          <input type="date" className="form-input" value={paymentDate} onChange={e => setPaymentDate(e.target.value)} />
+                        </div>
+                        <div>
+                          <label className="form-label">Amount (₹)</label>
+                          <input type="number" className="form-input" placeholder="0.00" value={paymentAmount} onChange={e => setPaymentAmount(e.target.value)} min="0" step="0.01" />
+                        </div>
+                      </div>
+                      <div style={{ marginBottom: '8px' }}>
+                        <label className="form-label">Remark (optional)</label>
+                        <input type="text" className="form-input" placeholder="e.g. Cheque no. 123" value={paymentRemark} onChange={e => setPaymentRemark(e.target.value)} />
+                      </div>
+                      {paymentError && <div style={{ color: '#E53E3E', fontSize: '12px', marginBottom: '6px' }}>{paymentError}</div>}
+                      <button
+                        className="save-btn"
+                        style={{ width: '100%' }}
+                        disabled={paymentSubmitting}
+                        onClick={async () => {
+                          if (!paymentDate || !paymentAmount) { setPaymentError('Date and amount are required.'); return; }
+                          setPaymentSubmitting(true); setPaymentError('');
+                          try {
+                            const res = await fetch(`${API_BASE}/credit-sales/${selectedCreditSale.id}/payments`, {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ payment_date: paymentDate, paid_amount: paymentAmount, remark: paymentRemark })
+                            });
+                            const data = await res.json();
+                            if (data.success) {
+                              setPaymentDate(''); setPaymentAmount(''); setPaymentRemark('');
+                              await loadSalePayments(selectedCreditSale.id);
+                              await loadCreditSales();
+                              // refresh balance in panel
+                              const updated = await fetch(`${API_BASE}/credit-sales`).then(r => r.json());
+                              if (updated.success) {
+                                setCreditSales(updated.data || []);
+                                const fresh = (updated.data || []).find(s => s.id === selectedCreditSale.id);
+                                if (fresh) setSelectedCreditSale(fresh);
+                              }
+                            } else {
+                              setPaymentError(data.message || 'Failed to add payment.');
+                            }
+                          } catch (e) {
+                            setPaymentError('Network error.');
+                          } finally {
+                            setPaymentSubmitting(false);
+                          }
+                        }}
+                      >{paymentSubmitting ? 'Saving...' : 'Add Payment'}</button>
+                    </div>
+
+                    {/* Payments list */}
+                    <div style={{ fontWeight: 600, fontSize: '13px', marginBottom: '8px', color: '#4A5568' }}>Payment History</div>
+                    {isLoadingPayments ? (
+                      <div style={{ textAlign: 'center', padding: '16px', color: '#A0AEC0', fontSize: '13px' }}>Loading...</div>
+                    ) : salePayments.length === 0 ? (
+                      <div style={{ textAlign: 'center', padding: '16px', color: '#A0AEC0', fontSize: '13px' }}>No payments recorded yet.</div>
+                    ) : (
+                      <table style={{ width: '100%', fontSize: '13px', borderCollapse: 'collapse' }}>
+                        <thead>
+                          <tr style={{ background: '#EDF2F7', borderRadius: '6px' }}>
+                            <th style={{ padding: '7px 10px', textAlign: 'left', fontWeight: 600 }}>Date</th>
+                            <th style={{ padding: '7px 10px', textAlign: 'right', fontWeight: 600 }}>Amount (₹)</th>
+                            <th style={{ padding: '7px 10px', textAlign: 'left', fontWeight: 600 }}>Remark</th>
+                            <th style={{ padding: '7px 10px', textAlign: 'center', fontWeight: 600 }}>Del</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {salePayments.map(p => (
+                            <tr key={p.id} style={{ borderBottom: '1px solid #EDF2F7' }}>
+                              <td style={{ padding: '7px 10px' }}>{p.payment_date ? String(p.payment_date).split('T')[0] : ''}</td>
+                              <td style={{ padding: '7px 10px', textAlign: 'right', color: '#38A169', fontWeight: 600 }}>₹{parseFloat(p.paid_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+                              <td style={{ padding: '7px 10px', color: '#718096' }}>{p.remark || '—'}</td>
+                              <td style={{ padding: '7px 10px', textAlign: 'center' }}>
+                                <button className="master-delete-btn" onClick={async () => {
+                                  if (!window.confirm('Delete this payment?')) return;
+                                  await fetch(`${API_BASE}/credit-sales/${selectedCreditSale.id}/payments/${p.id}`, { method: 'DELETE' });
+                                  await loadSalePayments(selectedCreditSale.id);
+                                  const updated = await fetch(`${API_BASE}/credit-sales`).then(r => r.json());
+                                  if (updated.success) {
+                                    setCreditSales(updated.data || []);
+                                    const fresh = (updated.data || []).find(s => s.id === selectedCreditSale.id);
+                                    if (fresh) setSelectedCreditSale(fresh);
+                                  }
+                                }}>
+                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path><path d="M10 11v6"></path><path d="M14 11v6"></path><path d="M9 6V4h6v2"></path></svg>
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Add / Edit Credit Sale Modal */}
+            {creditSaleModalOpen && (
+              <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) setCreditSaleModalOpen(false); }}>
+                <div className="modal-box" style={{ maxWidth: '440px', width: '95%' }}>
+                  <div className="modal-header">
+                    <h3>{creditSaleModalMode === 'create' ? 'Add Credit Sale' : 'Edit Credit Sale'}</h3>
+                    <button className="modal-close-btn" onClick={() => setCreditSaleModalOpen(false)}>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                    </button>
+                  </div>
+                  <div className="modal-body">
+                    <div className="form-row">
+                      <div className="form-group">
+                        <label className="form-label">Voucher No. <span style={{ color: '#E53E3E' }}>*</span></label>
+                        <input type="text" className="form-input" placeholder="e.g. CS-001" value={csVoucherNo} onChange={e => setCsVoucherNo(e.target.value)} />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">Date <span style={{ color: '#E53E3E' }}>*</span></label>
+                        <input type="date" className="form-input" value={csDate} onChange={e => setCsDate(e.target.value)} />
+                      </div>
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Party <span style={{ color: '#E53E3E' }}>*</span></label>
+                      <input type="text" className="form-input" placeholder="Party / Customer name" value={csParty} onChange={e => setCsParty(e.target.value)} />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Amount (₹) <span style={{ color: '#E53E3E' }}>*</span></label>
+                      <input type="number" className="form-input" placeholder="0.00" value={csAmount} onChange={e => setCsAmount(e.target.value)} min="0" step="0.01" />
+                    </div>
+                    {csFormError && <div style={{ color: '#E53E3E', fontSize: '12px', marginBottom: '8px' }}>{csFormError}</div>}
+                  </div>
+                  <div className="modal-footer">
+                    <button className="cancel-btn" onClick={() => setCreditSaleModalOpen(false)}>Cancel</button>
+                    <button className="save-btn" disabled={csSubmitting} onClick={async () => {
+                      if (!csVoucherNo || !csDate || !csParty || !csAmount) { setCsFormError('All fields are required.'); return; }
+                      setCsSubmitting(true); setCsFormError('');
+                      try {
+                        const url = creditSaleModalMode === 'create'
+                          ? `${API_BASE}/credit-sales`
+                          : `${API_BASE}/credit-sales/${editingCreditSaleId}`;
+                        const method = creditSaleModalMode === 'create' ? 'POST' : 'PUT';
+                        const res = await fetch(url, {
+                          method,
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ voucher_no: csVoucherNo, date: csDate, party: csParty, amount: csAmount })
+                        });
+                        const data = await res.json();
+                        if (data.success) {
+                          setCreditSaleModalOpen(false);
+                          loadCreditSales();
+                        } else {
+                          setCsFormError(data.message || 'Failed to save.');
+                        }
+                      } catch (e) {
+                        setCsFormError('Network error.');
+                      } finally {
+                        setCsSubmitting(false);
+                      }
+                    }}>{csSubmitting ? 'Saving...' : 'Save'}</button>
+                  </div>
                 </div>
               </div>
             )}
