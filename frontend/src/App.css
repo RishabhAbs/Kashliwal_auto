@@ -1469,6 +1469,65 @@ body {
   border-color: #CBD5E1;
 }
 
+.master-edit-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 5px 8px;
+  height: 30px;
+  background: #EBF8FF;
+  color: #2B6CB0;
+  border: 1px solid #BEE3F8;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+  white-space: nowrap;
+}
+
+.master-edit-btn:hover {
+  background: #BEE3F8;
+}
+
+.master-delete-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 5px 8px;
+  height: 30px;
+  background: #FFF5F5;
+  color: #C53030;
+  border: 1px solid #FEB2B2;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.master-delete-btn:hover {
+  background: #FED7D7;
+}
+
+.mobile-ledger-card {
+  background: #fff;
+  border: 1px solid #E2E8F0;
+  border-radius: 10px;
+  padding: 12px 14px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+}
+
+.mobile-only {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .mobile-only {
+    display: block;
+  }
+}
+
 .master-grid-card {
   background-color: var(--card-bg);
   border: 1px solid var(--border-color);
