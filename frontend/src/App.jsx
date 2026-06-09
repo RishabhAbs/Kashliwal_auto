@@ -200,6 +200,7 @@ function App() {
   const [isLoadingPayments, setIsLoadingPayments] = useState(false);
   const [paymentDate, setPaymentDate] = useState('');
   const [paymentAmount, setPaymentAmount] = useState('');
+  const [paymentVchType, setPaymentVchType] = useState('');
   const [paymentRemark, setPaymentRemark] = useState('');
   const [paymentSubmitting, setPaymentSubmitting] = useState(false);
   const [paymentError, setPaymentError] = useState('');
@@ -3612,7 +3613,7 @@ function App() {
                           <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
                             <button title="Add / View Payments" className="master-edit-btn" onClick={() => {
                               setSelectedCreditSale(sale);
-                              setPaymentDate(''); setPaymentAmount(''); setPaymentRemark(''); setPaymentError('');
+                              setPaymentDate(''); setPaymentAmount(''); setPaymentVchType(''); setPaymentRemark(''); setPaymentError('');
                               loadSalePayments(sale.id);
                             }}>
                               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -3731,9 +3732,15 @@ function App() {
                           <input type="number" className="form-input" placeholder="0.00" value={paymentAmount} onChange={e => setPaymentAmount(e.target.value)} min="0" step="0.01" />
                         </div>
                       </div>
-                      <div style={{ marginBottom: '8px' }}>
-                        <label className="form-label">Remark (optional)</label>
-                        <input type="text" className="form-input" placeholder="e.g. Cheque no. 123" value={paymentRemark} onChange={e => setPaymentRemark(e.target.value)} />
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '8px' }}>
+                        <div>
+                          <label className="form-label">Mode of Payment</label>
+                          <input type="text" className="form-input" placeholder="e.g. Cash, UPI, Cheque" value={paymentVchType} onChange={e => setPaymentVchType(e.target.value)} />
+                        </div>
+                        <div>
+                          <label className="form-label">Remark (optional)</label>
+                          <input type="text" className="form-input" placeholder="e.g. Cheque no. 123" value={paymentRemark} onChange={e => setPaymentRemark(e.target.value)} />
+                        </div>
                       </div>
                       {paymentError && <div style={{ color: '#E53E3E', fontSize: '12px', marginBottom: '6px' }}>{paymentError}</div>}
                       <button
@@ -3747,11 +3754,11 @@ function App() {
                             const res = await fetch(`${API_BASE}/credit-sales/${selectedCreditSale.id}/payments`, {
                               method: 'POST',
                               headers: { 'Content-Type': 'application/json' },
-                              body: JSON.stringify({ payment_date: paymentDate, paid_amount: paymentAmount, remark: paymentRemark })
+                              body: JSON.stringify({ payment_date: paymentDate, paid_amount: paymentAmount, vch_type: paymentVchType, remark: paymentRemark })
                             });
                             const data = await res.json();
                             if (data.success) {
-                              setPaymentDate(''); setPaymentAmount(''); setPaymentRemark('');
+                              setPaymentDate(''); setPaymentAmount(''); setPaymentVchType(''); setPaymentRemark('');
                               await loadSalePayments(selectedCreditSale.id);
                               await loadCreditSales();
                               // refresh balance in panel
@@ -3785,6 +3792,7 @@ function App() {
                           <tr style={{ background: '#EDF2F7', borderRadius: '6px' }}>
                             <th style={{ padding: '7px 10px', textAlign: 'left', fontWeight: 600 }}>Date</th>
                             <th style={{ padding: '7px 10px', textAlign: 'right', fontWeight: 600 }}>Amount (₹)</th>
+                            <th style={{ padding: '7px 10px', textAlign: 'left', fontWeight: 600 }}>Mode</th>
                             <th style={{ padding: '7px 10px', textAlign: 'left', fontWeight: 600 }}>Remark</th>
                             <th style={{ padding: '7px 10px', textAlign: 'center', fontWeight: 600 }}>Del</th>
                           </tr>
@@ -3794,6 +3802,7 @@ function App() {
                             <tr key={p.id} style={{ borderBottom: '1px solid #EDF2F7' }}>
                               <td style={{ padding: '7px 10px' }}>{p.payment_date ? String(p.payment_date).split('T')[0] : ''}</td>
                               <td style={{ padding: '7px 10px', textAlign: 'right', color: '#38A169', fontWeight: 600 }}>₹{parseFloat(p.paid_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+                              <td style={{ padding: '7px 10px', color: '#2B6CB0', fontWeight: 500 }}>{p.vch_type || '—'}</td>
                               <td style={{ padding: '7px 10px', color: '#718096' }}>{p.remark || '—'}</td>
                               <td style={{ padding: '7px 10px', textAlign: 'center' }}>
                                 <button className="master-delete-btn" onClick={async () => {

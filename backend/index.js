@@ -186,12 +186,15 @@ const initializeDatabase = async () => {
         credit_sale_id INT NOT NULL,
         payment_date DATE NOT NULL,
         paid_amount DECIMAL(15,2) NOT NULL,
+        vch_type VARCHAR(100),
         remark TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (credit_sale_id) REFERENCES credit_sales(id) ON DELETE CASCADE
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     `);
     console.log('Verified/Created "credit_sale_payments" table.');
+    // Add vch_type column if not exists (for existing DBs)
+    try { await dbPool.query("ALTER TABLE credit_sale_payments ADD COLUMN vch_type VARCHAR(100) AFTER paid_amount"); } catch(e) { /* already exists */ }
 
     await dbPool.query(`
       CREATE TABLE IF NOT EXISTS md_sales (
@@ -1252,14 +1255,14 @@ app.get('/api/credit-sales/:id/payments', async (req, res) => {
 
 // Add a payment to a credit sale
 app.post('/api/credit-sales/:id/payments', async (req, res) => {
-  const { payment_date, paid_amount, remark } = req.body;
+  const { payment_date, paid_amount, vch_type, remark } = req.body;
   if (!payment_date || !paid_amount) {
     return res.json({ success: false, message: 'Date and amount required.' });
   }
   try {
     const [result] = await dbPool.query(
-      'INSERT INTO credit_sale_payments (credit_sale_id, payment_date, paid_amount, remark) VALUES (?, ?, ?, ?)',
-      [req.params.id, payment_date, parseFloat(paid_amount), remark || '']
+      'INSERT INTO credit_sale_payments (credit_sale_id, payment_date, paid_amount, vch_type, remark) VALUES (?, ?, ?, ?, ?)',
+      [req.params.id, payment_date, parseFloat(paid_amount), vch_type || null, remark || '']
     );
     res.json({ success: true, id: result.insertId });
   } catch (e) {
