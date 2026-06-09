@@ -228,6 +228,7 @@ function App() {
       const res = await fetch(`${API_BASE}/tally/outstanding?${params}`);
       const resData = await res.json();
       if (resData.success) {
+        if (resData._debug) console.log('[Outstanding] debug:', resData._debug);
         setOutstandingRows(resData.data);
         setOutstandingEffectiveFrom(resData.fromDate || '');
         setOutstandingEffectiveTo(resData.toDate || '');

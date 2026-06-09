@@ -1095,7 +1095,7 @@ app.get('/api/tally/outstanding', async (req, res) => {
       request.end();
     });
 
-    console.log('Group Summary response preview:', rawResponse.slice(0, 500));
+    console.log('Group Summary response preview:', rawResponse.slice(0, 800));
 
     let jsonData;
     try { jsonData = JSON.parse(rawResponse); }
@@ -1105,14 +1105,36 @@ app.get('/api/tally/outstanding', async (req, res) => {
       throw new Error(`Tally error: ${(jsonData.error_list || []).join(', ')}`);
     }
 
-    const lines = jsonData?.data?.dspaccbody?.dspaccline || [];
+    // Try multiple known paths for dspaccline
+    const bodySection = jsonData?.data?.dspaccbody || jsonData?.dspaccbody || {};
+    let lines = bodySection?.dspaccline || [];
+    if (!Array.isArray(lines)) lines = lines ? [lines] : [];
+
+    // Fallback: search top-level keys if still empty
+    if (lines.length === 0) {
+      const topKeys = Object.keys(jsonData?.data || jsonData || {});
+      console.log(`[Outstanding] top-level keys: ${topKeys.join(', ')}`);
+      const bodyKeys = Object.keys(bodySection);
+      console.log(`[Outstanding] dspaccbody keys: ${bodyKeys.join(', ')}`);
+    }
+
     console.log(`Outstanding: ${lines.length} lines from Tally [${fromVal} → ${toVal}]`);
 
     const rows = [];
     for (const line of lines) {
-      const name = line?.dspaccname?.dspdispname || '';
+      const name = line?.dspaccname?.dspdispname || line?.dspdispname || '';
       if (!name) continue;
       const infoArr = Array.isArray(line?.dspaccinfo) ? line.dspaccinfo : (line?.dspaccinfo ? [line.dspaccinfo] : []);
+      if (infoArr.length === 0) {
+        // Some Tally versions put amounts directly on the line
+        const drRaw = parseFloat(line?.dspcldramt?.dspcldramta || line?.dspcldramta || 0);
+        const crRaw = parseFloat(line?.dspclcramt?.dspclcramta || line?.dspclcramta || 0);
+        let debit = 0, credit = 0;
+        if (drRaw > 0) debit = drRaw; else if (drRaw < 0) credit = Math.abs(drRaw);
+        if (crRaw > 0) credit = crRaw;
+        rows.push({ name, debit, credit });
+        continue;
+      }
       for (const info of infoArr) {
         const drRaw = parseFloat(info?.dspcldramt?.dspcldramta || 0);
         const crRaw = parseFloat(info?.dspclcramt?.dspclcramta || 0);
@@ -1124,7 +1146,8 @@ app.get('/api/tally/outstanding', async (req, res) => {
       }
     }
 
-    res.json({ success: true, data: rows, fromDate: fromVal, toDate: toVal });
+    const topKeys = Object.keys(jsonData?.data || jsonData || {});
+    res.json({ success: true, data: rows, fromDate: fromVal, toDate: toVal, _debug: { linesCount: lines.length, topKeys } });
   } catch (error) {
     console.error('Outstanding error:', error.message);
     res.status(503).json({ success: false, message: error.message, data: [] });
