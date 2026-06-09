@@ -171,6 +171,20 @@ function App() {
   const [creditSales, setCreditSales] = useState([]);
   const [isLoadingCreditSales, setIsLoadingCreditSales] = useState(false);
   const [creditSalesSearch, setCreditSalesSearch] = useState('');
+
+  // MD Sales states
+  const [mdSales, setMdSales] = useState([]);
+  const [isLoadingMdSales, setIsLoadingMdSales] = useState(false);
+  const [mdSalesSearch, setMdSalesSearch] = useState('');
+  const [mdModalOpen, setMdModalOpen] = useState(false);
+  const [mdModalMode, setMdModalMode] = useState('create');
+  const [editingMdId, setEditingMdId] = useState(null);
+  const [mdDate, setMdDate] = useState('');
+  const [mdVchType, setMdVchType] = useState('');
+  const [mdParty, setMdParty] = useState('');
+  const [mdAmount, setMdAmount] = useState('');
+  const [mdFormError, setMdFormError] = useState('');
+  const [mdSubmitting, setMdSubmitting] = useState(false);
   const [creditSaleModalOpen, setCreditSaleModalOpen] = useState(false);
   const [creditSaleModalMode, setCreditSaleModalMode] = useState('create');
   const [editingCreditSaleId, setEditingCreditSaleId] = useState(null);
@@ -201,6 +215,16 @@ function App() {
     } finally {
       setIsLoadingCreditSales(false);
     }
+  };
+
+  const loadMdSales = async () => {
+    setIsLoadingMdSales(true);
+    try {
+      const res = await fetch(`${API_BASE}/md-sales`);
+      const data = await res.json();
+      if (data.success) setMdSales(data.data || []);
+    } catch (e) { /* silently fail */ }
+    finally { setIsLoadingMdSales(false); }
   };
 
   const loadSalePayments = async (saleId) => {
@@ -1253,6 +1277,7 @@ function App() {
             {hasPermission('outstanding') && <a href="#outstanding" className={`nav-tab ${activeTab === 'outstanding' ? 'active' : ''}`} onClick={() => setActiveTab('outstanding')}>Outstanding</a>}
             {hasPermission('transaction') && <a href="#transaction" className={`nav-tab ${activeTab === 'transaction' ? 'active' : ''}`} onClick={() => setActiveTab('transaction')}>Transaction</a>}
             {isAdmin() && <a href="#credit-sales" className={`nav-tab ${activeTab === 'credit-sales' ? 'active' : ''}`} onClick={() => { setActiveTab('credit-sales'); loadCreditSales(); }}>Credit Sales</a>}
+            {isAdmin() && <a href="#md-sales" className={`nav-tab ${activeTab === 'md-sales' ? 'active' : ''}`} onClick={() => { setActiveTab('md-sales'); loadMdSales(); }}>MD Sales</a>}
           </div>
         </div>
 
@@ -3854,6 +3879,190 @@ function App() {
                         setCsSubmitting(false);
                       }
                     }}>{csSubmitting ? 'Saving...' : 'Save'}</button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* VIEW: MD Sales */}
+        {activeTab === 'md-sales' && (
+          <div className="ledger-master-view">
+            <div className="master-toolbar-row">
+              <div className="master-search-bar-full">
+                <svg className="flex-search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#A0AEC0" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="11" cy="11" r="8"></circle>
+                  <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                </svg>
+                <input type="text" placeholder="Search by party or voucher type..." value={mdSalesSearch} onChange={e => setMdSalesSearch(e.target.value)} />
+              </div>
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button className="master-sync-btn" title="Refresh" onClick={loadMdSales} disabled={isLoadingMdSales}>
+                  <svg className={isLoadingMdSales ? 'animate-spin' : ''} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4A5568" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline>
+                    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                  </svg>
+                </button>
+                <button className="add-transaction-trigger-btn animate-button" onClick={() => {
+                  setMdModalMode('create'); setEditingMdId(null);
+                  setMdDate(''); setMdVchType(''); setMdParty(''); setMdAmount(''); setMdFormError('');
+                  setMdModalOpen(true);
+                }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line>
+                  </svg>
+                  <span className="txn-btn-label">Add MD Sale</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Desktop table */}
+            <div className="master-grid-card desktop-only">
+              <div className="master-table-wrapper">
+                <table className="master-format-table">
+                  <thead>
+                    <tr>
+                      <th style={{ width: '5%', textAlign: 'center' }}>#</th>
+                      <th style={{ width: '12%' }}>Date</th>
+                      <th style={{ width: '15%' }}>Vch Type</th>
+                      <th style={{ width: '45%' }}>Party</th>
+                      <th style={{ width: '15%', textAlign: 'right' }}>Amount (₹)</th>
+                      <th style={{ width: '8%', textAlign: 'center' }}>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {isLoadingMdSales ? (
+                      <tr><td colSpan="6" style={{ textAlign: 'center', padding: '30px', color: '#A0AEC0' }}>Loading...</td></tr>
+                    ) : mdSales.filter(s =>
+                        s.party?.toLowerCase().includes(mdSalesSearch.toLowerCase()) ||
+                        (s.vch_type || '').toLowerCase().includes(mdSalesSearch.toLowerCase())
+                      ).length === 0 ? (
+                      <tr><td colSpan="6" style={{ textAlign: 'center', padding: '30px', color: '#A0AEC0' }}>No MD sales found.</td></tr>
+                    ) : mdSales.filter(s =>
+                        s.party?.toLowerCase().includes(mdSalesSearch.toLowerCase()) ||
+                        (s.vch_type || '').toLowerCase().includes(mdSalesSearch.toLowerCase())
+                      ).map((sale, idx) => (
+                      <tr key={sale.id}>
+                        <td style={{ textAlign: 'center' }}>{idx + 1}</td>
+                        <td>{sale.date ? sale.date.split('T')[0] : '—'}</td>
+                        <td>{sale.vch_type || '—'}</td>
+                        <td>{sale.party}</td>
+                        <td style={{ textAlign: 'right', fontWeight: 600 }}>₹{parseFloat(sale.amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+                        <td style={{ textAlign: 'center' }}>
+                          <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
+                            <button title="Edit" className="master-edit-btn" onClick={() => {
+                              setMdModalMode('edit'); setEditingMdId(sale.id);
+                              setMdDate(sale.date ? sale.date.split('T')[0] : '');
+                              setMdVchType(sale.vch_type || '');
+                              setMdParty(sale.party); setMdAmount(String(sale.amount)); setMdFormError('');
+                              setMdModalOpen(true);
+                            }}>
+                              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                              </svg>
+                            </button>
+                            <button title="Delete" className="master-delete-btn" onClick={async () => {
+                              if (!window.confirm(`Delete this MD sale?`)) return;
+                              await fetch(`${API_BASE}/md-sales/${sale.id}`, { method: 'DELETE' });
+                              loadMdSales();
+                            }}>
+                              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                <polyline points="3 6 5 6 21 6"></polyline>
+                                <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path>
+                                <path d="M10 11v6"></path><path d="M14 11v6"></path><path d="M9 6V4h6v2"></path>
+                              </svg>
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Mobile cards */}
+            <div className="mobile-only" style={{ padding: '0 12px 80px' }}>
+              {mdSales.filter(s =>
+                s.party?.toLowerCase().includes(mdSalesSearch.toLowerCase()) ||
+                (s.vch_type || '').toLowerCase().includes(mdSalesSearch.toLowerCase())
+              ).map(sale => (
+                <div key={sale.id} className="mobile-ledger-card" style={{ marginBottom: '10px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <div>
+                      <div style={{ fontWeight: 600, fontSize: '14px' }}>{sale.party}</div>
+                      <div style={{ fontSize: '12px', color: '#718096' }}>{sale.vch_type || '—'} &bull; {sale.date ? sale.date.split('T')[0] : '—'}</div>
+                    </div>
+                    <div style={{ fontWeight: 600 }}>₹{parseFloat(sale.amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+                    <button className="master-edit-btn" onClick={() => {
+                      setMdModalMode('edit'); setEditingMdId(sale.id);
+                      setMdDate(sale.date ? sale.date.split('T')[0] : ''); setMdVchType(sale.vch_type || '');
+                      setMdParty(sale.party); setMdAmount(String(sale.amount)); setMdFormError('');
+                      setMdModalOpen(true);
+                    }}>Edit</button>
+                    <button className="master-delete-btn" onClick={async () => {
+                      if (!window.confirm(`Delete this MD sale?`)) return;
+                      await fetch(`${API_BASE}/md-sales/${sale.id}`, { method: 'DELETE' });
+                      loadMdSales();
+                    }}>Del</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Add / Edit MD Sale Modal */}
+            {mdModalOpen && (
+              <div className="modal-backdrop-overlay" style={{ zIndex: 9999, position: 'fixed', inset: 0 }} onClick={e => { if (e.target === e.currentTarget) setMdModalOpen(false); }}>
+                <div className="modal-content-card" style={{ maxWidth: '420px', width: '95%', maxHeight: 'unset' }}>
+                  <div className="modal-header-row">
+                    <h3>{mdModalMode === 'create' ? 'Add MD Sale' : 'Edit MD Sale'}</h3>
+                    <button className="modal-close-btn" onClick={() => setMdModalOpen(false)}>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                    </button>
+                  </div>
+                  <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    <div style={{ display: 'flex', gap: '12px' }}>
+                      <div style={{ flex: 1 }}>
+                        <label className="form-label">Date <span style={{ color: '#718096', fontSize: '11px' }}>(optional)</span></label>
+                        <input type="date" className="form-input" value={mdDate} onChange={e => setMdDate(e.target.value)} />
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <label className="form-label">Vch Type <span style={{ color: '#718096', fontSize: '11px' }}>(optional)</span></label>
+                        <input type="text" className="form-input" placeholder="e.g. Sales, Receipt" value={mdVchType} onChange={e => setMdVchType(e.target.value)} />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="form-label">Party <span style={{ color: '#E53E3E' }}>*</span></label>
+                      <input type="text" className="form-input" placeholder="Party / Customer name" value={mdParty} onChange={e => setMdParty(e.target.value)} />
+                    </div>
+                    <div>
+                      <label className="form-label">Amount (₹) <span style={{ color: '#E53E3E' }}>*</span></label>
+                      <input type="number" className="form-input" placeholder="0.00" value={mdAmount} onChange={e => setMdAmount(e.target.value)} min="0" step="0.01" />
+                    </div>
+                    {mdFormError && <div style={{ color: '#E53E3E', fontSize: '12px' }}>{mdFormError}</div>}
+                  </div>
+                  <div className="modal-footer-actions" style={{ padding: '0 20px 16px' }}>
+                    <button className="modal-btn" style={{ background: '#F1F5F9', color: '#4A5568' }} onClick={() => setMdModalOpen(false)}>Cancel</button>
+                    <button className="modal-btn" style={{ background: '#F9575C', color: '#fff' }} disabled={mdSubmitting} onClick={async () => {
+                      if (!mdParty || !mdAmount) { setMdFormError('Party and Amount are required.'); return; }
+                      setMdSubmitting(true); setMdFormError('');
+                      try {
+                        const url = mdModalMode === 'create' ? `${API_BASE}/md-sales` : `${API_BASE}/md-sales/${editingMdId}`;
+                        const method = mdModalMode === 'create' ? 'POST' : 'PUT';
+                        const res = await fetch(url, {
+                          method, headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ date: mdDate || null, vch_type: mdVchType || null, party: mdParty, amount: mdAmount })
+                        });
+                        const data = await res.json();
+                        if (data.success) { setMdModalOpen(false); loadMdSales(); }
+                        else { setMdFormError(data.message || 'Failed to save.'); }
+                      } catch (e) { setMdFormError('Network error.'); }
+                      finally { setMdSubmitting(false); }
+                    }}>{mdSubmitting ? 'Saving...' : 'Save'}</button>
                   </div>
                 </div>
               </div>

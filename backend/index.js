@@ -193,6 +193,18 @@ const initializeDatabase = async () => {
     `);
     console.log('Verified/Created "credit_sale_payments" table.');
 
+    await dbPool.query(`
+      CREATE TABLE IF NOT EXISTS md_sales (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        \`date\` DATE,
+        vch_type VARCHAR(100),
+        party VARCHAR(255) NOT NULL,
+        amount DECIMAL(15,2) NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+    console.log('Verified/Created "md_sales" table.');
+
     // 6. Seed default super admin user if empty (to allow initial login)
     const [userRows] = await dbPool.query('SELECT COUNT(*) as count FROM users');
     if (userRows[0].count === 0) {
@@ -1263,6 +1275,45 @@ app.delete('/api/credit-sales/:saleId/payments/:payId', async (req, res) => {
   } catch (e) {
     res.json({ success: false, message: e.message });
   }
+});
+
+// ── MD Sales ──────────────────────────────────────────────────────────────────
+
+app.get('/api/md-sales', async (req, res) => {
+  try {
+    const [rows] = await dbPool.query('SELECT * FROM md_sales ORDER BY created_at DESC');
+    res.json({ success: true, data: rows });
+  } catch (e) { res.json({ success: false, message: e.message, data: [] }); }
+});
+
+app.post('/api/md-sales', async (req, res) => {
+  const { date, vch_type, party, amount } = req.body;
+  if (!party || !amount) return res.json({ success: false, message: 'Party and Amount are required.' });
+  try {
+    const [result] = await dbPool.query(
+      'INSERT INTO md_sales (`date`, vch_type, party, amount) VALUES (?, ?, ?, ?)',
+      [date || null, vch_type || null, party, parseFloat(amount)]
+    );
+    res.json({ success: true, id: result.insertId });
+  } catch (e) { res.json({ success: false, message: e.message }); }
+});
+
+app.put('/api/md-sales/:id', async (req, res) => {
+  const { date, vch_type, party, amount } = req.body;
+  try {
+    await dbPool.query(
+      'UPDATE md_sales SET `date`=?, vch_type=?, party=?, amount=? WHERE id=?',
+      [date || null, vch_type || null, party, parseFloat(amount), req.params.id]
+    );
+    res.json({ success: true });
+  } catch (e) { res.json({ success: false, message: e.message }); }
+});
+
+app.delete('/api/md-sales/:id', async (req, res) => {
+  try {
+    await dbPool.query('DELETE FROM md_sales WHERE id=?', [req.params.id]);
+    res.json({ success: true });
+  } catch (e) { res.json({ success: false, message: e.message }); }
 });
 
 // Tally TCP ping — call GET /api/tally/ping to test raw connectivity
