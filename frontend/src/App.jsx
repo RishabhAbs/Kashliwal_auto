@@ -1243,7 +1243,7 @@ function App() {
       {/* Navbar */}
       <nav className="navbar">
         <div className="nav-left">
-          <div className="logo-container">
+          <div className="logo-container" onClick={() => setActiveTab('home')} style={{ cursor: 'pointer' }}>
             <img src={logoImg} alt="ABS Technologies Logo" className="logo-img" />
           </div>
           <div className="nav-tabs">
