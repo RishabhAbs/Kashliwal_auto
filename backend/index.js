@@ -1057,6 +1057,16 @@ app.get('/api/tally/outstanding', async (req, res) => {
       { name: 'svToDate',         value: toVal },
       { name: 'IsLedgerWise',     value: 'Yes' },
       { name: 'svCurrentCompany', value: TALLY_COMPANY }
+    ],
+    tdlmessage: [
+      {
+        definitions: [
+          {
+            metadata: { name: 'Ledger Vouchers', type: 'Report', ismodify: true },
+            attributes: [{ 'Export Empty Fields': 'No' }]
+          }
+        ]
+      }
     ]
   });
 
