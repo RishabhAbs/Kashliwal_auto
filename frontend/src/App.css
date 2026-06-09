@@ -1721,6 +1721,32 @@ body {
   color: #1A202C;
 }
 
+.form-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: #4A5568;
+  margin-bottom: 5px;
+}
+
+.form-input {
+  width: 100%;
+  height: 36px;
+  padding: 0 10px;
+  border: 1px solid #E2E8F0;
+  border-radius: 8px;
+  font-size: 13px;
+  color: #2D3748;
+  background: #fff;
+  outline: none;
+  box-sizing: border-box;
+  transition: border-color 0.2s;
+}
+
+.form-input:focus {
+  border-color: #F9575C;
+}
+
 .modal-ledger-form {
   padding: 18px;
   display: flex;
